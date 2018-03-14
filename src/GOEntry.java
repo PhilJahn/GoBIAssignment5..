@@ -1,3 +1,4 @@
+import java.util.HashMap;
 import java.util.HashSet;
 
 public class GOEntry {
@@ -9,6 +10,8 @@ public class GOEntry {
 	private HashSet<String> succ;
 	private HashSet<String> gene;
 	
+	private HashMap<String,Integer> dist;
+	
 	public GOEntry(String id, String name, HashSet<String> isa){
 		this.id = id;
 		this.name = name;
@@ -17,6 +20,8 @@ public class GOEntry {
 		pred = new HashSet<String>();
 		succ = new HashSet<String>();
 		gene = new HashSet<String>();
+		
+		dist = new HashMap<String,Integer>();
 	}
 	
 	public String getId(){
@@ -91,6 +96,26 @@ public class GOEntry {
 		entryBuilder.append(gene.toString());
 		
 		return entryBuilder.toString();
+	}
+	
+	public HashMap<String,Integer> getDistance(){
+		return dist;
+	}
+	
+	public void addDistance(HashMap<String,Integer> parentDist, String parent){
+		int value= 0;
+		for(String pred: parentDist.keySet()){
+			value = parentDist.get(pred)+1;
+			if(dist.containsKey(pred)){
+				if(dist.get(pred) > value){
+					dist.put(pred, value);
+				}
+			}
+			else{
+				dist.put(pred, value);
+			}
+		}
+		dist.put(parent,1);
 	}
 
 }

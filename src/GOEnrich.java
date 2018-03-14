@@ -90,10 +90,12 @@ public class GOEnrich {
 		else{
 			
 			Path oboFilePath = Paths.get(oboPath);
+			Path simulationFilePath = Paths.get(simulationPath);
 			
-			File oboFile = oboFilePath.toFile();
+			File oboFile = oboFilePath.toFile();			
+			File simFile = simulationFilePath.toFile();
 			try {
-				GOEnrich goe = new GOEnrich(oboFile, goname, type, mappingPath);
+				GOEnrich goe = new GOEnrich(oboFile, goname, type, mappingPath, simFile);
 				
 			} catch (Exception e) {
 				e.printStackTrace();
@@ -105,11 +107,20 @@ public class GOEnrich {
 	HashMap<String,HashSet<String>> overlaps;
 	HashMap<String,Gene> genes;
 	
-	public GOEnrich(File oboFile, String goname, Type mtype, String mappingPath) throws IOException{
+	HashSet<String> enrichedGO;
+	HashSet<String> enrichedGene;
+	HashSet<String> signif;
+	
+	
+	public GOEnrich(File oboFile, String goname, Type mtype, String mappingPath, File simFile) throws IOException{
 		
 		go_entries = new HashMap<String,GOEntry>();
 		overlaps = new HashMap<String,HashSet<String>>();
 		genes = new HashMap<String,Gene>();
+		
+		enrichedGO = new HashSet<String>();
+		enrichedGene = new HashSet<String>();
+		signif = new HashSet<String>();
 		
 		BufferedReader obobr = new BufferedReader (new FileReader(oboFile));
 		String line ="";
@@ -224,6 +235,7 @@ public class GOEnrich {
 	    						}
 	    					}
 	    					for(String goe1: curGOEntry){
+	    						setDist(goe1);
 	    						for(String goe2: curGOEntry){
 	    							addOverlap(goe1,goe2);
 	    						}
@@ -248,6 +260,7 @@ public class GOEnrich {
 				}
 			}
 			for(String goe1: curGOEntry){
+				setDist(goe1);
 				for(String goe2: curGOEntry){
 					addOverlap(goe1,goe2);
 				}
@@ -265,10 +278,32 @@ public class GOEnrich {
 //	    	System.out.println(go1 + ": " + overlaps.get(go1).toString());
 //	    }
 	    
-	    for(String go_entry: go_entries.keySet()){
-	    	System.out.println(go_entries.get(go_entry).toString());
+//	    for(String go_entry: go_entries.keySet()){
+//	    	System.out.println(go_entries.get(go_entry).toString());
+//	    }
+	    
+		BufferedReader simbr = new BufferedReader (new FileReader(simFile));
+		line ="";
+
+	    while ((line = simbr.readLine()) != null){
+	    	if(line.startsWith("#")){
+	    		enrichedGO.add(line.substring(1));
+	    	}
+	    	else if(line.equals("id\tfc\tsignif")){}
+	    	else{
+	    		String[] lineSplit = line.split("\t");
+	    		String geneid = lineSplit[0];
+	    		enrichedGene.add(geneid);
+	    		if(genes.containsKey(geneid)){
+	    			genes.get(geneid).setFC(Double.parseDouble(lineSplit[1]));
+	    			if(lineSplit[2].equals("true")){
+	    				signif.add(geneid);
+	    			}
+	    		}
+	    	}
 	    }
-		
+	    
+	    simbr.close();
 	}
 	
 	@SuppressWarnings("unchecked")
@@ -366,6 +401,26 @@ public class GOEnrich {
 			}
 		}
 		
+	}
+	
+	public HashMap<String,Integer> setDist(String goeid){
+		
+		GOEntry goe = go_entries.get(goeid);
+		HashMap<String,Integer> stor = new HashMap<String,Integer>();
+		
+		
+		if(goe.getDistance().isEmpty()){
+			for(String parent_id : goe.is_a()){
+				if(go_entries.containsKey(parent_id)){
+					stor = this.setDist(parent_id);
+				}
+				else{
+					stor = new HashMap<String,Integer>();
+				}
+				goe.addDistance(stor, parent_id);
+			}
+		}
+		return goe.getDistance();
 	}
 	
 }
