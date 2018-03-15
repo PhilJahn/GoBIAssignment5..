@@ -3,15 +3,19 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.zip.*;
+import org.apache.commons.math3.distribution.HypergeometricDistribution;
+import org.apache.commons.math3.stat.inference.KolmogorovSmirnovTest;
 
 public class GOEnrich {
 	public enum Type{ensembl,go};
@@ -95,14 +99,18 @@ public class GOEnrich {
 			File oboFile = oboFilePath.toFile();			
 			File simFile = simulationFilePath.toFile();
 			try {
-				GOEnrich goe = new GOEnrich(oboFile, goname, type, mappingPath, simFile);
+				GOEnrich goe = new GOEnrich(oboFile, goname, type, mappingPath, simFile, minsize, maxsize);
+				goe.getOutput(outputPath);
+				if(!ooutputPath.equals("")){
+					goe.getOverlapOut(ooutputPath);
+				}
 				
 			} catch (Exception e) {
 				e.printStackTrace();
 			}
 		}
 	}
-	
+
 	HashMap<String,GOEntry> go_entries;
 	HashMap<String,HashSet<String>> overlaps;
 	HashMap<String,Gene> genes;
@@ -111,8 +119,11 @@ public class GOEnrich {
 	HashSet<String> enrichedGene;
 	HashSet<String> signif;
 	
+	private int minSize;
+	private int maxSize;
 	
-	public GOEnrich(File oboFile, String goname, Type mtype, String mappingPath, File simFile) throws IOException{
+	
+	public GOEnrich(File oboFile, String goname, Type mtype, String mappingPath, File simFile, int minSize, int maxSize) throws IOException{
 		
 		go_entries = new HashMap<String,GOEntry>();
 		overlaps = new HashMap<String,HashSet<String>>();
@@ -121,6 +132,9 @@ public class GOEnrich {
 		enrichedGO = new HashSet<String>();
 		enrichedGene = new HashSet<String>();
 		signif = new HashSet<String>();
+		
+		this.minSize = minSize;
+		this.maxSize = maxSize;
 		
 		BufferedReader obobr = new BufferedReader (new FileReader(oboFile));
 		String line ="";
@@ -421,6 +435,253 @@ public class GOEnrich {
 			}
 		}
 		return goe.getDistance();
+	}
+	
+	public void getOverlapOut(String outputPath) throws IOException {
+		String tab = "\t";
+		String brk = "\n";
+		char dop = ':';
+		char sip = '|';
+		char lin = '-';
+		char com = ',';
+		char spa = ' ';
+		
+		StringBuilder resultBuilder = new StringBuilder("");
+		resultBuilder.append("term1\tterm2\tis_relative\tpath_length\tnum_overlapping\tmax_ov_percent\n");
+		FileWriter outputWriter = new FileWriter(outputPath,false);
+		outputWriter.write(resultBuilder.toString());
+		resultBuilder.setLength(0);
+		
+		ArrayList<String> overlapKeyList = new ArrayList<String>(overlaps.keySet());
+		overlapKeyList.sort(new StringComparator());
+		
+		GOEntry goe1;
+		GOEntry goe2;
+		
+		HashSet<String> goe1Pred;
+		HashSet<String> goe1Succ;
+		HashSet<String> goe1Gene;
+		HashMap<String,Integer> goe1Dist; 
+		int goe1Size;
+		
+		HashSet<String> goe2Pred;
+//		HashSet<String> goe2Succ;
+		HashSet<String> goe2Gene;
+		HashMap<String,Integer> goe2Dist;
+		int goe2Size;
+		
+		boolean relative = false;
+		int dist = -1;
+		int overlap = -1;
+		double percent = -1;
+		
+		for(String goe1Id: overlapKeyList){
+			goe1 = go_entries.get(goe1Id);
+			ArrayList<String> goe2List = new ArrayList<String>(overlaps.get(goe1Id));
+			goe2List.sort(new StringComparator());
+			for(String goe2Id: goe2List){
+				if(!goe2Id.equals(goe1Id)){
+					goe2 = go_entries.get(goe2Id);
+					
+					goe1Pred = new HashSet<String>(goe1.getPred());
+					goe1Succ = new HashSet<String>(goe1.getSucc());
+					goe1Gene = new HashSet<String>(goe1.getGenes());
+					goe1Dist = new HashMap<String,Integer>(goe1.getDistance());
+					goe1Size = goe1Gene.size();
+					
+					goe2Pred = new HashSet<String>(goe2.getPred());
+//					goe2Succ = new HashSet<String>(goe2.getSucc());
+					goe2Gene = new HashSet<String>(goe2.getGenes());
+					goe2Dist = new HashMap<String,Integer>(goe2.getDistance());
+					goe2Size = goe2Gene.size();
+					
+					if(goe1Size >= minSize && goe2Size >= minSize && goe1Size <= maxSize && goe2Size <= maxSize){
+						resultBuilder.append(goe1Id);
+						resultBuilder.append(tab);
+						resultBuilder.append(goe2Id);
+						resultBuilder.append(tab);
+						
+						relative = goe1Pred.contains(goe2Id) || goe1Succ.contains(goe2Id);
+						
+						resultBuilder.append(relative);
+						resultBuilder.append(tab);
+						
+						if(relative){
+							if(goe1Dist.containsKey(goe2Id)){
+								dist = goe1Dist.get(goe2);
+							}
+							else if(goe2Dist.containsKey(goe1Id)){
+								dist = goe2Dist.get(goe1);
+							}
+							else{
+								dist = -3;
+							}
+						}
+						else{
+							goe1Pred.retainAll(goe2Pred);
+							for(String compred : goe1Pred){
+								if(dist == -1){
+									dist = goe1Dist.get(compred) + goe2Dist.get(compred);
+								}
+								else{
+									dist = Math.min(dist, goe1Dist.get(compred) + goe2Dist.get(compred));
+								}
+							}
+						}
+						resultBuilder.append(dist);
+						resultBuilder.append(tab);
+						
+						goe1Gene.retainAll(goe2Gene);
+						overlap = goe1Gene.size();
+						
+						resultBuilder.append(overlap);
+						resultBuilder.append(tab);
+						
+						percent = (overlap* 100.0)/goe1Size;
+						percent = Math.max(percent, (overlap* 100.0)/goe2Size);
+						
+						resultBuilder.append(percent);
+						resultBuilder.append(brk);
+						
+						outputWriter.write(resultBuilder.toString());
+						resultBuilder.setLength(0);
+					}
+				}
+			}
+		}
+		outputWriter.close();
+		
+	}
+
+	public void getOutput(String outputPath) throws IOException {
+		String tab = "\t";
+		String brk = "\n";
+		char dop = ':';
+		char sip = '|';
+		char lin = '-';
+		char com = ',';
+		char spa = ' ';
+		
+		StringBuilder resultBuilder = new StringBuilder("");
+		resultBuilder.append("term\tname\tsize\tis_true\tnoverlap\thg_pval\thg_fdr\tfej_pval\tfej_fdr\tks_stat\tks_pval\tks_fdr\tshortest_path_to_a_true\n");
+		FileWriter outputWriter = new FileWriter(outputPath,false);
+		outputWriter.write(resultBuilder.toString());
+		resultBuilder.setLength(0);
+		
+		ArrayList<GOEntry> outputGOE = new ArrayList<GOEntry>();
+		ArrayList<Double> hgValues = new ArrayList<Double>();
+		ArrayList<Double> fejValues = new ArrayList<Double>();
+		ArrayList<Double> kssValues = new ArrayList<Double>();
+		ArrayList<Double> kspValues = new ArrayList<Double>();
+		
+		GOEntry goe;
+		HashSet<String> goeGene;
+		int size;
+		int noverlap;
+		
+		HypergeometricDistribution hd;
+		KolmogorovSmirnovTest kst;
+		
+		for(String goeid: go_entries.keySet()){
+			goe = go_entries.get(goeid);
+			goeGene = goe.getGenes();
+			if(goeGene.size() >= minSize && goeGene.size() <= maxSize){
+				goeGene.retainAll(enrichedGene);
+				size = goe.size;
+				goe.setSize(size);
+				
+				goeGene.retainAll(signif);
+				noverlap = goe.size;
+				goe.setNOverlap(noverlap);
+				
+				goe.setTruth(enrichedGO.contains(goeid));
+				outputGOE.add(goe);
+				
+				hd = new HypergeometricDistribution(maxSize, maxSize, maxSize);
+				hgValues.add(0.0);
+				
+				fejValues.add(0.0);
+				
+				kst = new KolmogorovSmirnovTest();
+				kssValues.add(0.0);
+				kspValues.add(0.0);
+			}
+		}
+		
+		double[] hghbValues = BenjaminiHochberg((Double[]) hgValues.toArray());
+		double[] fejhbValues = BenjaminiHochberg((Double[]) fejValues.toArray());
+		double[] kshbValues = BenjaminiHochberg((Double[]) kspValues.toArray());
+		
+		StringBuilder spBuilder = new StringBuilder();
+		
+		for(int i = 0; i < outputGOE.size(); i++){
+			goe = outputGOE.get(i);
+			resultBuilder.append(goe.getId());
+			resultBuilder.append(tab);
+			
+			resultBuilder.append(goe.getName());
+			resultBuilder.append(tab);
+			
+			resultBuilder.append(goe.getSize());
+			resultBuilder.append(tab);
+			
+			resultBuilder.append(goe.getTruth());
+			resultBuilder.append(tab);
+			
+			resultBuilder.append(goe.getNOverlap());
+			resultBuilder.append(tab);
+			
+			resultBuilder.append(hgValues.get(i));
+			resultBuilder.append(tab);
+			resultBuilder.append(hghbValues[i]);
+			resultBuilder.append(tab);
+			
+			resultBuilder.append(fejValues.get(i));
+			resultBuilder.append(tab);
+			resultBuilder.append(fejhbValues[i]);
+			resultBuilder.append(tab);
+			
+			resultBuilder.append(kssValues.get(i));
+			resultBuilder.append(tab);
+			resultBuilder.append(kspValues.get(i));
+			resultBuilder.append(tab);
+			resultBuilder.append(kshbValues[i]);
+			resultBuilder.append(tab);
+			
+			resultBuilder.append(spBuilder.toString());
+			resultBuilder.append(brk);
+			spBuilder.setLength(0);
+			
+			outputWriter.write(resultBuilder.toString());
+			resultBuilder.setLength(0);
+		}
+		
+	}
+	
+	public double[] BenjaminiHochberg(Double[] pValues) {
+		
+		int length = pValues.length;
+        Arrays.sort(pValues);
+        double[] apValues = new double[length];
+
+        for (int i = length - 1; i >= 0; i--) {
+            if (i == length - 1) {
+                apValues[i] = pValues[i];
+            } else {
+                double l = apValues[i + 1];
+                double r = (length / (double) (i+1)) * pValues[i];
+                apValues[i] = Math.min(l, r);
+            }
+        }
+        return apValues;
+	}
+	
+	class StringComparator implements Comparator<String>
+	{
+	    public int compare(String x1, String x2)
+	    {
+	        return x1.compareTo(x2);
+	    }
 	}
 	
 }

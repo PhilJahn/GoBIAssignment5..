@@ -12,6 +12,10 @@ public class GOEntry {
 	
 	private HashMap<String,Integer> dist;
 	
+	int size;
+	int noverlap;
+	boolean istrue;
+	
 	public GOEntry(String id, String name, HashSet<String> isa){
 		this.id = id;
 		this.name = name;
@@ -117,5 +121,28 @@ public class GOEntry {
 		}
 		dist.put(parent,1);
 	}
-
+	
+	public void setSize(int size){
+		this.size = size;
+	}
+	
+	public int getSize(){
+		return size;
+	}
+	
+	public void setNOverlap(int noverlap){
+		this.noverlap = noverlap;
+	}
+	
+	public int getNOverlap(){
+		return noverlap;
+	}
+	
+	public void setTruth(boolean truth){
+		istrue = truth;
+	}
+	
+	public boolean getTruth(){
+		return istrue;
+	}
 }
