@@ -433,6 +433,7 @@ public class GOEnrich {
 				}
 				goe.addDistance(stor, parent_id);
 			}
+			goe.putDistance(goeid,0);
 		}
 		return goe.getDistance();
 	}
@@ -561,6 +562,7 @@ public class GOEnrich {
 		char lin = '-';
 		char com = ',';
 		char spa = ' ';
+		char str = '*';
 		
 		StringBuilder resultBuilder = new StringBuilder("");
 		resultBuilder.append("term\tname\tsize\tis_true\tnoverlap\thg_pval\thg_fdr\tfej_pval\tfej_fdr\tks_stat\tks_pval\tks_fdr\tshortest_path_to_a_true\n");
@@ -580,6 +582,7 @@ public class GOEnrich {
 		int noverlap;
 		
 		HypergeometricDistribution hd;
+		HypergeometricDistribution fej;
 		KolmogorovSmirnovTest kst;
 		
 		for(String goeid: go_entries.keySet()){
@@ -587,20 +590,22 @@ public class GOEnrich {
 			goeGene = goe.getGenes();
 			if(goeGene.size() >= minSize && goeGene.size() <= maxSize){
 				goeGene.retainAll(enrichedGene);
-				size = goe.size;
+				size = goe.getSize();
 				goe.setSize(size);
 				
 				goeGene.retainAll(signif);
-				noverlap = goe.size;
+				noverlap = goe.getSize();
 				goe.setNOverlap(noverlap);
 				
 				goe.setTruth(enrichedGO.contains(goeid));
 				outputGOE.add(goe);
 				
-				hd = new HypergeometricDistribution(maxSize, maxSize, maxSize);
-				hgValues.add(0.0);
+				hd = new HypergeometricDistribution(genes.size(), signif.size(), size);
 				
-				fejValues.add(0.0);
+				hgValues.add(hd.probability(noverlap));
+				
+				fej = new HypergeometricDistribution(genes.size()-1, signif.size()-1, size-1);
+				fejValues.add(fej.probability(noverlap-1));
 				
 				kst = new KolmogorovSmirnovTest();
 				kssValues.add(0.0);
@@ -613,6 +618,19 @@ public class GOEnrich {
 		double[] kshbValues = BenjaminiHochberg((Double[]) kspValues.toArray());
 		
 		StringBuilder spBuilder = new StringBuilder();
+		
+		int minDist = -1;
+		int dist;
+		GOEntry minGOE = null;
+		GOEntry trueGOE = null;
+		
+		HashSet<String> goePred = null;
+		HashMap<String, Integer> goe1Dist;
+		HashMap<String, Integer> goe2Dist;
+		HashSet<GOEntry> trueGO = new HashSet<GOEntry>();
+		for(String eGOE:enrichedGO){
+			trueGO.add(go_entries.get(eGOE));
+		}
 		
 		for(int i = 0; i < outputGOE.size(); i++){
 			goe = outputGOE.get(i);
@@ -646,9 +664,82 @@ public class GOEnrich {
 			resultBuilder.append(kspValues.get(i));
 			resultBuilder.append(tab);
 			resultBuilder.append(kshbValues[i]);
-			resultBuilder.append(tab);
 			
-			resultBuilder.append(spBuilder.toString());
+			if(!goe.getTruth()){
+				goe1Dist = goe.getDistance();
+				for(GOEntry tGOE : trueGO){
+					goe2Dist = tGOE.getDistance();
+					if(goe1Dist.containsKey(tGOE.getId())){
+						if(minDist == -1){
+							minDist = goe1Dist.get(tGOE.getId());
+							minGOE = tGOE;
+							trueGOE = tGOE;
+						}
+						else{
+							dist = goe1Dist.get(tGOE.getId());
+							if(minDist > dist){
+								minDist = dist;
+								minGOE = tGOE;
+								trueGOE = tGOE;						
+							}
+						}
+					}
+					else if(goe2Dist.containsKey(goe.getId())){
+						if(minDist == -1){
+							minDist = goe2Dist.get(goe.getId());
+							minGOE = goe;
+							trueGOE = tGOE;
+						}
+						else{
+							dist = goe2Dist.get(goe.getId());
+							if(minDist > dist){
+								minDist = dist;
+								minGOE = goe;
+								trueGOE = tGOE;						
+							}
+						}
+					}
+					else{
+						goePred = new HashSet<String>(goe.getPred());
+						goePred.retainAll(tGOE.getPred());
+						for(String compred : goePred){
+							if(minDist == -1){
+								minDist = goe1Dist.get(compred) + goe2Dist.get(compred);
+								minGOE = go_entries.get(compred);
+								trueGOE = tGOE;
+							}
+							else{
+								dist = goe1Dist.get(compred) + goe2Dist.get(compred);
+								if(minDist > dist){
+									minDist = dist;
+									minGOE = go_entries.get(compred);
+									trueGOE = tGOE;									
+								}
+							}
+						}
+					}
+				}
+				
+				ArrayList<String> goeToLCA =  getPath(goe,minGOE,goe.getDistance().get(minGOE.getId()));
+				
+				spBuilder.append(go_entries.get(goeToLCA.get(0)).getName());
+				for(int j = 1; j < goeToLCA.size(); j++){
+					spBuilder.append(sip);
+					spBuilder.append(go_entries.get(goeToLCA.get(j)).getName());
+				}
+				spBuilder.append(str);
+				
+				ArrayList<String> tgoeToLCA =  getPath(trueGOE,minGOE,trueGOE.getDistance().get(minGOE.getId()));
+				for(int j = tgoeToLCA.size()-2; j > 0; j--){
+					spBuilder.append(sip);
+					spBuilder.append(go_entries.get(tgoeToLCA.get(j)).getName());					
+				}
+					
+				resultBuilder.append(tab);
+				resultBuilder.append(spBuilder.toString());
+			}
+			
+			
 			resultBuilder.append(brk);
 			spBuilder.setLength(0);
 			
@@ -674,6 +765,40 @@ public class GOEnrich {
             }
         }
         return apValues;
+	}
+	
+	public ArrayList<String> getPath(GOEntry goeFrom, GOEntry goeTo, int length){
+		ArrayList<String> result = null;
+		String goeToId = goeTo.getId();
+		String goeFromId = goeFrom.getId();
+		GOEntry parent;
+		if(goeFrom.getPath(goeToId) != null){
+			return goeFrom.getPath(goeToId);
+		}
+		else if(goeFromId.equals(goeToId)){
+			result = new ArrayList<String>();
+			result.add(goeFrom.getId());
+			goeFrom.setPath(result);
+		}
+		else{
+			for(String goePId : goeFrom.is_a()){
+				parent = go_entries.get(goePId);
+				if(parent.getDistance().containsKey(goeToId)){
+					if(parent.getDistance().get(goeToId) == length-1){
+						if(parent.getPath(goeToId) == null){
+							result = getPath(parent,goeTo,length-1);
+						}
+						else{
+							result = parent.getPath(goeToId);
+						}
+						result.add(0, goeFromId);
+						goeFrom.setPath(result);
+						break;
+					}
+				}
+			}
+		}
+		return result;
 	}
 	
 	class StringComparator implements Comparator<String>

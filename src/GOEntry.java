@@ -1,3 +1,4 @@
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 
@@ -12,9 +13,11 @@ public class GOEntry {
 	
 	private HashMap<String,Integer> dist;
 	
-	int size;
-	int noverlap;
-	boolean istrue;
+	private int size;
+	private int noverlap;
+	private boolean istrue;
+	
+	private HashMap<String,ArrayList<String>> paths;
 	
 	public GOEntry(String id, String name, HashSet<String> isa){
 		this.id = id;
@@ -26,6 +29,8 @@ public class GOEntry {
 		gene = new HashSet<String>();
 		
 		dist = new HashMap<String,Integer>();
+		
+		paths = new HashMap<String,ArrayList<String>>();
 	}
 	
 	public String getId(){
@@ -122,6 +127,10 @@ public class GOEntry {
 		dist.put(parent,1);
 	}
 	
+	public void putDistance(String id,int dist){
+		this.dist.put(id,dist);
+	}
+	
 	public void setSize(int size){
 		this.size = size;
 	}
@@ -144,5 +153,20 @@ public class GOEntry {
 	
 	public boolean getTruth(){
 		return istrue;
+	}
+	
+	public void setPath(ArrayList<String> path){
+		for(int i =path.size()-1; i >= 0; i--){
+			paths.put(path.get(i),new ArrayList<String>(path.subList(0, i+1)));
+		}
+	}
+	
+	public ArrayList<String> getPath(String id){
+		if(paths.containsKey(id)){
+			return paths.get(id);
+		}
+		else{
+			return null;
+		}
 	}
 }
