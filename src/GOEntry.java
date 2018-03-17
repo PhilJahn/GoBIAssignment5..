@@ -103,6 +103,10 @@ public class GOEntry {
 		entryBuilder.append("Genes:");
 		entryBuilder.append(tab);
 		entryBuilder.append(gene.toString());
+		entryBuilder.append(brk);
+		entryBuilder.append("Dist:");
+		entryBuilder.append(tab);
+		entryBuilder.append(dist.toString());
 		
 		return entryBuilder.toString();
 	}

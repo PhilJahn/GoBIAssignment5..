@@ -3,7 +3,7 @@ public class Gene {
 
 	private String name;
 	
-	private double fc = 0;
+	private double fc;
 	
 	public Gene(String name){
 		this.name = name;

@@ -152,25 +152,31 @@ public class GOEnrich {
 	        else{
 	        	isa = new HashSet<String>();
 	        	for(String ti: goterm){
-	        		if(ti.contains("id:")){
+	        		if(ti.startsWith("id:")){
 	        			String[] tisplit = ti.split(": ");
 	        			go_id = tisplit[1];
+	        			if(go_id.equals("GO:1903034")){
+	        				System.out.println(goterm.toString());
+	        			}
 	        		}
-	        		else if(ti.contains("name:")){
+	        		else if(ti.startsWith("name:")){
 	        			String[] tisplit = ti.split(": ");
 	        			go_name = tisplit[1];
 	        		}
-	        		else if(ti.contains("namespace:")){
+	        		else if(ti.startsWith("namespace:")){
 	        			String[] tisplit = ti.split(": ");
 	        			go_namespace = tisplit[1];
 	        		}
-	        		else if(ti.contains("is_a:")){
+	        		else if(ti.startsWith("is_a:")){
 	        			String[] tisplit = ti.split(": ");
 	        			tisplit = tisplit[1].split(" ! ");
 	        			isa.add(tisplit[0]);
 	        		}
 	        	}
 	        	if(!go_id.equals("")){
+        			if(go_id.equals("GO:1903034")){
+        				System.out.println("I was here!");
+        			}
 	        		if(go_namespace.equals(goname)){
 	        			GOEntry newGOEntry = new GOEntry(go_id,go_name,isa);
 	        			go_entries.put(go_id,newGOEntry);
@@ -183,6 +189,8 @@ public class GOEnrich {
 	        	goterm.clear();
 	        }
 	    }
+	    
+	    System.out.println(go_entries.containsKey("GO:1903034"));
 	    
 	    obobr.close();
 	    
@@ -302,6 +310,11 @@ public class GOEnrich {
 	    while ((line = simbr.readLine()) != null){
 	    	if(line.startsWith("#")){
 	    		enrichedGO.add(line.substring(1));
+//	    		System.out.println(line.substring(1));
+//	    		System.out.println(go_entries.containsKey(line.substring(1)));
+//	    		System.out.println(go_entries.get(line.substring(1)).toString());
+	    		setDist(line.substring(1));
+	    		
 	    	}
 	    	else if(line.equals("id\tfc\tsignif")){}
 	    	else{
@@ -585,16 +598,37 @@ public class GOEnrich {
 		HypergeometricDistribution fej;
 		KolmogorovSmirnovTest kst;
 		
+		ArrayList<Double> backgroundFC = new ArrayList<Double>();
+		
+		enrichedGene.retainAll(genes.keySet());
+		for(String eg : enrichedGene){
+			backgroundFC.add(genes.get(eg).getFC());
+		}
+		
+		double[] bfc  = new double[backgroundFC.size()];
+		for(int i = 0; i < bfc.length; i++){
+			bfc[i] = backgroundFC.get(i);
+		}
+		double[] fc;
+
+		
 		for(String goeid: go_entries.keySet()){
 			goe = go_entries.get(goeid);
 			goeGene = goe.getGenes();
 			if(goeGene.size() >= minSize && goeGene.size() <= maxSize){
 				goeGene.retainAll(enrichedGene);
-				size = goe.getSize();
+				size = goeGene.size();
 				goe.setSize(size);
 				
+				fc = new double[goeGene.size()];
+				int j = 0;
+				for(String g: goeGene){
+					fc[j] = genes.get(g).getFC();
+					j++;
+				}
+				
 				goeGene.retainAll(signif);
-				noverlap = goe.getSize();
+				noverlap = goeGene.size();
 				goe.setNOverlap(noverlap);
 				
 				goe.setTruth(enrichedGO.contains(goeid));
@@ -608,14 +642,18 @@ public class GOEnrich {
 				fejValues.add(fej.probability(noverlap-1));
 				
 				kst = new KolmogorovSmirnovTest();
-				kssValues.add(0.0);
-				kspValues.add(0.0);
+				kssValues.add(kst.kolmogorovSmirnovStatistic(fc, bfc));
+				kspValues.add(kst.kolmogorovSmirnovTest(fc, bfc));
 			}
 		}
 		
-		double[] hghbValues = BenjaminiHochberg((Double[]) hgValues.toArray());
-		double[] fejhbValues = BenjaminiHochberg((Double[]) fejValues.toArray());
-		double[] kshbValues = BenjaminiHochberg((Double[]) kspValues.toArray());
+		Double[] hgArray = new Double[hgValues.size()];
+		Double[] fejArray = new Double[fejValues.size()];
+		Double[] kspArray = new Double[kspValues.size()];
+		
+		double[] hghbValues = BenjaminiHochberg(hgValues.toArray(hgArray));
+		double[] fejhbValues = BenjaminiHochberg(fejValues.toArray(fejArray));
+		double[] kshbValues = BenjaminiHochberg(kspValues.toArray(kspArray));
 		
 		StringBuilder spBuilder = new StringBuilder();
 		
@@ -667,6 +705,12 @@ public class GOEnrich {
 			
 			if(!goe.getTruth()){
 				goe1Dist = goe.getDistance();
+				if(goe1Dist.isEmpty()){
+					setDist(goe.getId());
+				}
+				minDist = -1;
+				minGOE = null;
+				trueGOE = null;
 				for(GOEntry tGOE : trueGO){
 					goe2Dist = tGOE.getDistance();
 					if(goe1Dist.containsKey(tGOE.getId())){
@@ -719,6 +763,9 @@ public class GOEnrich {
 						}
 					}
 				}
+				
+//				System.out.println(goe.toString());
+//				System.out.println(minGOE.getId());
 				
 				ArrayList<String> goeToLCA =  getPath(goe,minGOE,goe.getDistance().get(minGOE.getId()));
 				
