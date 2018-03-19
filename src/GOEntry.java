@@ -11,6 +11,8 @@ public class GOEntry {
 	private HashSet<String> succ;
 	private HashSet<String> gene;
 	
+//	private boolean obsolete;
+	
 	private HashMap<String,Integer> dist;
 	
 	private int size;
@@ -23,7 +25,7 @@ public class GOEntry {
 		this.id = id;
 		this.name = name;
 		this.isa = isa;
-	
+
 		pred = new HashSet<String>();
 		succ = new HashSet<String>();
 		gene = new HashSet<String>();
@@ -107,6 +109,14 @@ public class GOEntry {
 		entryBuilder.append("Dist:");
 		entryBuilder.append(tab);
 		entryBuilder.append(dist.toString());
+		entryBuilder.append(brk);
+		entryBuilder.append("Size:");
+		entryBuilder.append(tab);
+		entryBuilder.append(this.getSize());
+		entryBuilder.append(brk);
+//		entryBuilder.append("Obsolete:");
+//		entryBuilder.append(tab);
+//		entryBuilder.append(obsolete);
 		
 		return entryBuilder.toString();
 	}
@@ -173,4 +183,8 @@ public class GOEntry {
 			return null;
 		}
 	}
+
+//	public boolean isObsolete() {
+//		return obsolete;
+//	}
 }
