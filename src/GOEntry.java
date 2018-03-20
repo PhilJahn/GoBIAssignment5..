@@ -125,8 +125,8 @@ public class GOEntry {
 		return dist;
 	}
 	
-	public void addDistance(HashMap<String,Integer> parentDist, String parent){
-		int value= 0;
+	public void addDistance(HashMap<String,Integer> parentDist){
+		int value;
 		for(String pred: parentDist.keySet()){
 			value = parentDist.get(pred)+1;
 			if(dist.containsKey(pred)){
@@ -138,7 +138,6 @@ public class GOEntry {
 				dist.put(pred, value);
 			}
 		}
-		dist.put(parent,1);
 	}
 	
 	public void putDistance(String id,int dist){
