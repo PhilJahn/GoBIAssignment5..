@@ -11,8 +11,6 @@ public class GOEntry {
 	private HashSet<String> succ;
 	private HashSet<String> gene;
 	
-//	private boolean obsolete;
-	
 	private HashMap<String,Integer> dist;
 	
 	private int size;
@@ -33,6 +31,7 @@ public class GOEntry {
 		dist = new HashMap<String,Integer>();
 		
 		paths = new HashMap<String,ArrayList<String>>();
+		
 	}
 	
 	public String getId(){
@@ -113,10 +112,6 @@ public class GOEntry {
 		entryBuilder.append("Size:");
 		entryBuilder.append(tab);
 		entryBuilder.append(this.getSize());
-		entryBuilder.append(brk);
-//		entryBuilder.append("Obsolete:");
-//		entryBuilder.append(tab);
-//		entryBuilder.append(obsolete);
 		
 		return entryBuilder.toString();
 	}
@@ -169,9 +164,13 @@ public class GOEntry {
 	}
 	
 	public void setPath(ArrayList<String> path){
+		
+//		System.out.println("SetPath: " + id);
+//		System.out.println(path.toString());
 		for(int i =path.size()-1; i >= 0; i--){
 			paths.put(path.get(i),new ArrayList<String>(path.subList(0, i+1)));
 		}
+//		System.out.println(paths.toString());
 	}
 	
 	public ArrayList<String> getPath(String id){
@@ -182,8 +181,9 @@ public class GOEntry {
 			return null;
 		}
 	}
+	
+	public HashMap<String,ArrayList<String>> getPaths(){
+		return paths;
+	}
 
-//	public boolean isObsolete() {
-//		return obsolete;
-//	}
 }

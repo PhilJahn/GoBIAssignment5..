@@ -19,7 +19,6 @@ import org.apache.commons.math3.distribution.HypergeometricDistribution;
 import org.apache.commons.math3.stat.inference.KolmogorovSmirnovTest;
 
 public class GOEnrich {
-	public enum Type{ensembl,go};
 	
 	public static void main(String[] args) {
 		
@@ -105,15 +104,15 @@ public class GOEnrich {
 				if(!ooutputPath.equals("")){
 //					goe.getOverlapOut(ooutputPath);
 				}
-				else{
-					goe.getOutput(outputPath);				
-				}
+				goe.getOutput(outputPath);
 				
 			} catch (Exception e) {
 				e.printStackTrace();
 			}
 		}
 	}
+	
+	public enum Type{ensembl,go};
 
 	HashMap<String,GOEntry> go_entries;
 	HashMap<String,HashSet<String>> overlaps;
@@ -126,6 +125,8 @@ public class GOEnrich {
 	
 	private int minSize;
 	private int maxSize;
+	
+//	HashMap<String,HashSet<String>> tmpoverlaps;
 	
 	
 	public GOEnrich(File oboFile, String goname, Type mtype, String mappingPath, File simFile, int minSize, int maxSize) throws IOException{
@@ -179,10 +180,10 @@ public class GOEnrich {
 	        			tisplit = tisplit[1].split(" ! ");
 	        			isa.add(tisplit[0]);
 	        		}
-//	        		else if(ti.startsWith("is_obsolete:")){
-//	        			String[] tisplit = ti.split(": ");
-//	        			obsolete = Boolean.valueOf(tisplit[1]);
-//	        		}
+	        		else if(ti.startsWith("is_obsolete:")){
+	        			String[] tisplit = ti.split(": ");
+	        			obsolete = Boolean.valueOf(tisplit[1]);
+	        		}
 	        	}
 	        	if(!go_id.equals("")){
 //        			if(go_id.equals("GO:1903034")){
@@ -191,7 +192,7 @@ public class GOEnrich {
 	        		if(go_namespace.equals(goname)){
 		        		GOEntry newGOEntry = new GOEntry(go_id,go_name,isa);
 		        		go_entries.put(go_id,newGOEntry);
-//	        			obsolete = false;
+	        			obsolete = false;
 	        		}
 	        	}
 	        	
@@ -215,20 +216,22 @@ public class GOEnrich {
 			
 			File mappingFile = mappingFilePath.toFile();
 			BufferedReader mapbr = new BufferedReader (new FileReader(mappingFile));
+			
+			boolean inNameSpace;
+			
 			line = mapbr.readLine();
 			while ((line = mapbr.readLine()) != null){
 				String[] lineSplit = line.split("\t");
 				String geneid = lineSplit[1];
+				inNameSpace = false;
 				if(!geneid.equals("")){
 					Gene curGene = new Gene(geneid);
-					genes.put(geneid,curGene);
-					if(!gene_go.containsKey(geneid)){
-						gene_go.put(geneid, new HashSet<String>());
-					}
+
 					String[] goes = lineSplit[2].split("\\|");
 					for(int i = 0; i < goes.length; i++){
 //						System.out.println(goes[i]);
 						if(go_entries.containsKey(goes[i])){
+							inNameSpace = true;
     						GOEntry goe = go_entries.get(goes[i]);
     						goe.addGene(geneid);
     						setDist(goes[i]);
@@ -236,10 +239,15 @@ public class GOEnrich {
     							go_entries.get(predgoeid).addGene(geneid);
 //    							gene_go.get(geneid).add(predgoeid);
     						}
+    						if(!gene_go.containsKey(geneid)){
+    							gene_go.put(geneid, new HashSet<String>());
+    						}
     						gene_go.get(geneid).add(goes[i]);
 	    				}
 					}
-					
+					if(inNameSpace){
+						genes.put(geneid,curGene);
+					}
 				}
 			}
 			mapbr.close();
@@ -252,6 +260,7 @@ public class GOEnrich {
 
 	    	String geneid = "";
 	    	String goeid ="";
+	    	
 	    	HashSet<String> curGOEntry = new HashSet<String>();
 	    	while ((line = gafbr.readLine()) != null) {
 	    		if(!line.startsWith("!")){
@@ -259,12 +268,12 @@ public class GOEnrich {
 	    			if(lineSplit[3].equals("")){
 	    				geneid = lineSplit[2];
 	    				Gene newGene = new Gene(lineSplit[2]);
-	    				genes.put(geneid,newGene);
-						if(!gene_go.containsKey(geneid)){
-							gene_go.put(geneid, new HashSet<String>());
-						}
 						goeid = lineSplit[4];
 						if(go_entries.containsKey(goeid)){
+		    				genes.put(geneid,newGene);
+							if(!gene_go.containsKey(geneid)){
+								gene_go.put(geneid, new HashSet<String>());
+							}
     						GOEntry goe = go_entries.get(goeid);
     						goe.addGene(geneid);
     						setDist(goeid);
@@ -309,8 +318,39 @@ public class GOEnrich {
 //	    	System.out.println(go_entries.get(go_entry).toString());
 //	    }
 	    
+//		Path overlapFilePath = Paths.get("C:/Users/User/Desktop/Gobi5/ensembl_40_400_overlaps.out");
+//		File overlapFile = overlapFilePath.toFile();
+//		BufferedReader obr = new BufferedReader (new FileReader(overlapFile));
+//		line = obr.readLine();
+//		
+//		String goe1 ="";
+//		String goe2 ="";
+//		
+//		tmpoverlaps = new HashMap<String,HashSet<String>>();
+//		
+//	    while ((line = obr.readLine()) != null){
+//    		String[] lineSplit = line.split("\t");
+//    		goe1 = lineSplit[0];
+//    		goe2 = lineSplit[1];
+//    			
+//			if(goe1.compareTo(goe2) > 0){
+//				if(!tmpoverlaps.containsKey(goe2)){
+//					tmpoverlaps.put(goe2,new HashSet<String>());
+//				}
+//				tmpoverlaps.get(goe2).add(goe1);
+//			}
+//			else{
+//				if(!tmpoverlaps.containsKey(goe1)){
+//					tmpoverlaps.put(goe1,new HashSet<String>());
+//				}
+//				tmpoverlaps.get(goe1).add(goe2);						
+//			}
+//	    }
+		
+	    
 		BufferedReader simbr = new BufferedReader (new FileReader(simFile));
 		line ="";
+		
 
 	    while ((line = simbr.readLine()) != null){
 	    	if(line.startsWith("#")){
@@ -495,6 +535,8 @@ public class GOEnrich {
 		
 		String minAnc = "";
 		
+		boolean inOutput = false;
+		
 		for(String goe1Id: overlapKeyList){
 			goe1 = go_entries.get(goe1Id);
 			ArrayList<String> goe2List = new ArrayList<String>(overlaps.get(goe1Id));
@@ -521,16 +563,9 @@ public class GOEnrich {
 				    
 					
 					if(goe1Size >= minSize && goe2Size >= minSize && goe1Size <= maxSize && goe2Size <= maxSize){
-						resultBuilder.append(goe1Id);
-						resultBuilder.append(tab);
-						resultBuilder.append(goe2Id);
-						resultBuilder.append(tab);
 						
 						relative = goe1Pred.contains(goe2Id) || goe1Succ.contains(goe2Id);
-						
-						resultBuilder.append(relative);
-						resultBuilder.append(tab);
-						
+
 						goe1Pred.retainAll(goe2Pred);
 						if(relative){
 							if(goe1Dist.containsKey(goe2Id)){
@@ -554,30 +589,59 @@ public class GOEnrich {
 								}
 							}							
 						}
-						resultBuilder.append(dist);
-						resultBuilder.append(tab);
 						
-						goe1Gene.retainAll(goe2Gene);
-						overlap = goe1Gene.size();
+						if(dist != -1){
+							resultBuilder.append(goe1Id);
+							resultBuilder.append(tab);
+							resultBuilder.append(goe2Id);
+							resultBuilder.append(tab);
+							
+							resultBuilder.append(relative);
+							resultBuilder.append(tab);
+							
+							resultBuilder.append(dist);
+							resultBuilder.append(tab);
+							
+							goe1Gene.retainAll(goe2Gene);
+							overlap = goe1Gene.size();
+							
+							resultBuilder.append(overlap);
+							resultBuilder.append(tab);
+							
+							percent = (overlap* 100.0)/goe1Size;
+							percent = Math.max(percent, (overlap* 100.0)/goe2Size);
+							
+							resultBuilder.append(percent);
+							resultBuilder.append(brk);
+							
+							outputWriter.append(resultBuilder.toString());
+							resultBuilder.setLength(0);
+						}
+
 						
-						resultBuilder.append(overlap);
-						resultBuilder.append(tab);
+//						inOutput =false;
+//						if(tmpoverlaps.containsKey(goe1Id)){
+//							inOutput = tmpoverlaps.get(goe1Id).contains(goe2Id);
+//						}
+//						
+//						
+//						
+//						resultBuilder.append(tab);
+//						if(inOutput){
+//							resultBuilder.append("is_in");
+//						}
+//						else{
+//							resultBuilder.append("is_not_in");
+//						}
 						
-						percent = (overlap* 100.0)/goe1Size;
-						percent = Math.max(percent, (overlap* 100.0)/goe2Size);
-						
-						resultBuilder.append(percent);
-						resultBuilder.append(brk);
-						
-						outputWriter.write(resultBuilder.toString());
 						
 //						if(goe1Id.equals("GO:0043543") && goe2Id.equals("GO:0043966")){
 //							System.out.println(goe1Pred.toString());
 //							System.out.println(minAnc.toString());
 //							System.out.println(resultBuilder.toString());
 //						}
+						
 //						
-						resultBuilder.setLength(0);
 					}
 				}
 			}
@@ -623,8 +687,7 @@ public class GOEnrich {
 		signif.retainAll(genes.keySet());
 		int eSize = enrichedGene.size();
 		int sSize = signif.size();
-		
-		enrichedGene.retainAll(genes.keySet());
+
 		for(String eg : enrichedGene){
 			backgroundFC.add(genes.get(eg).getFC());
 		}
@@ -639,10 +702,14 @@ public class GOEnrich {
 		for(String goeid: go_entries.keySet()){
 			goe = go_entries.get(goeid);
 			goeGene = new HashSet<String>(goe.getGenes());
-//			if(goeid.equals("GO:0006200")){
+//			if(goeid.equals("GO:0044380")){
 //				System.out.println(goe.toString());
+//				System.out.println(goeGene.size());
 //			}
 			if(goeGene.size() >= minSize && goeGene.size() <= maxSize){
+//				if(goeid.equals("GO:0044380")){
+//					System.out.println("I was here!");
+//				}
 				goeGene.retainAll(enrichedGene);
 				size = goeGene.size();
 				goe.setSize(size);
@@ -690,6 +757,7 @@ public class GOEnrich {
 		GOEntry trueGOE = null;
 		
 		HashSet<String> goePred = null;
+		HashSet<String> tgoePred = null;
 		HashMap<String, Integer> goe1Dist;
 		HashMap<String, Integer> goe2Dist;
 		HashSet<GOEntry> trueGO = new HashSet<GOEntry>();
@@ -701,49 +769,68 @@ public class GOEnrich {
 		for(int i = 0; i < outputGOE.size(); i++){
 			goe = outputGOE.get(i);
 			
+//			if(goe.getId().equals("GO:0044380")){
+//				System.out.println("I was here, too!");
+//			}
+			
 			if(!goe.getTruth()){
+//				if(goe.getId().equals("GO:0006641")){
+//					System.out.println(goe.toString());
+//				}
 				goe1Dist = goe.getDistance();
-				if(goe1Dist.isEmpty()){
-					setDist(goe.getId());
-				}
 				minDist = -1;
 				minGOE = null;
 				trueGOE = null;
 				for(GOEntry tGOE : trueGO){
 					goe2Dist = tGOE.getDistance();
-					if(goe1Dist.containsKey(tGOE.getId())){
-						if(minDist == -1){
-							minDist = goe1Dist.get(tGOE.getId());
-							minGOE = tGOE;
-							trueGOE = tGOE;
-						}
-						else{
-							dist = goe1Dist.get(tGOE.getId());
-							if(minDist > dist){
-								minDist = dist;
-								minGOE = tGOE;
-								trueGOE = tGOE;						
-							}
-						}
-					}
-					else if(goe2Dist.containsKey(goe.getId())){
-						if(minDist == -1){
-							minDist = goe2Dist.get(goe.getId());
-							minGOE = goe;
-							trueGOE = tGOE;
-						}
-						else{
-							dist = goe2Dist.get(goe.getId());
-							if(minDist > dist){
-								minDist = dist;
-								minGOE = goe;
-								trueGOE = tGOE;						
-							}
-						}
-					}
-					else{
+//					if(goe.getId().equals("GO:0006641")){
+//						System.out.print(tGOE.getId());
+//					}
+//					if(goe1Dist.containsKey(tGOE.getId())){
+//						if(minDist == -1){
+//							minDist = goe1Dist.get(tGOE.getId());
+//							minGOE = tGOE;
+//							trueGOE = tGOE;
+//						}
+//						else{
+//							dist = goe1Dist.get(tGOE.getId());
+//							if(minDist > dist){
+//								minDist = dist;
+//								minGOE = tGOE;
+//								trueGOE = tGOE;						
+//							}
+//						}
+////						if(goe.getId().equals("GO:0006641")){
+////							System.out.println(" " + minDist + " " + minGOE.getId() + " " + trueGOE.getId() );
+////						}
+//					}
+//					else if(goe2Dist.containsKey(goe.getId())){
+//						if(minDist == -1){
+//							minDist = goe2Dist.get(goe.getId());
+//							minGOE = goe;
+//							trueGOE = tGOE;
+//						}
+//						else{
+//							dist = goe2Dist.get(goe.getId());
+//							if(minDist > dist){
+//								minDist = dist;
+//								minGOE = goe;
+//								trueGOE = tGOE;						
+//							}
+//						}
+//						if(goe.getId().equals("GO:0006641")){
+//							System.out.println(" " + minDist + " " + minGOE.getId() + " " + trueGOE.getId() );
+//						}
+//					}
+//					else{
 						goePred = new HashSet<String>(goe.getPred());
-						goePred.retainAll(tGOE.getPred());
+						goePred.add(goe.getId());
+						
+						tgoePred = new HashSet<String>(tGOE.getPred());
+						tgoePred.add(tGOE.getId());
+						
+						goePred.retainAll(tgoePred);
+						
 						for(String compred : goePred){
 							if(minDist == -1){
 								minDist = goe1Dist.get(compred) + goe2Dist.get(compred);
@@ -759,14 +846,17 @@ public class GOEnrich {
 								}
 							}
 						}
-					}
+//						if(goe.getId().equals("GO:0006641")){
+//							System.out.println(" " + minDist + " " + minGOE.getId() + " " + trueGOE.getId() );
+//						}
+//					}
 				}
 				
 //				System.out.println(goe.toString());
 				
 				if(!(minGOE != null)){
 				}else{
-					
+
 					resultBuilder.append(goe.getId());
 					resultBuilder.append(tab);
 					
@@ -798,8 +888,22 @@ public class GOEnrich {
 					resultBuilder.append(tab);
 					resultBuilder.append(kshbValues[i]);
 				
+//					if(goe.getId().equals("GO:0006641")){
+//						System.out.println(goe.getPath(minGOE.getId()) );
+//						System.out.println(trueGOE.getPath(minGOE.getId()) );
+//						
+//						System.out.println(trueGOE.toString());
+//					}
+//					
+					
+//					System.out.println(goe.getId());
+//					System.out.println(go_entries.get("GO:0044699").getPaths().toString());
+
 					ArrayList<String> goeToLCA =  getPath(goe,minGOE,goe.getDistance().get(minGOE.getId()));
 					
+//					if(goe.getId().equals("GO:0006641")){
+//						System.out.println(goe.getId() + " " + minGOE.getId() + ": " +  goeToLCA.toString() );
+//					}
 					spBuilder.append(go_entries.get(goeToLCA.get(0)).getName());
 					for(int j = 1; j < goeToLCA.size(); j++){
 						spBuilder.append(sip);
@@ -808,18 +912,36 @@ public class GOEnrich {
 					spBuilder.append(str);
 					
 					ArrayList<String> tgoeToLCA =  getPath(trueGOE,minGOE,trueGOE.getDistance().get(minGOE.getId()));
-					for(int j = tgoeToLCA.size()-2; j > 0; j--){
+					
+//					if(goe.getId().equals("GO:0006641")){
+//						System.out.println(trueGOE.getId() + " " + minGOE.getId() + ": " + tgoeToLCA.toString() );
+//					}
+					
+					for(int j = tgoeToLCA.size()-2; j >= 0; j--){
 						spBuilder.append(sip);
 						spBuilder.append(go_entries.get(tgoeToLCA.get(j)).getName());					
 					}
 					resultBuilder.append(tab);
 					resultBuilder.append(spBuilder.toString());
+					
+//					resultBuilder.append(tab);
+//					resultBuilder.append(minDist);
+//					
+//					resultBuilder.append(tab);
+//					resultBuilder.append(goeToLCA.size() + tgoeToLCA .size() -2);
+//					
+//					resultBuilder.append(tab);
+//					resultBuilder.append(minGOE.getId());
+//					
+//					resultBuilder.append(tab);
+//					resultBuilder.append(trueGOE.getId());
+					
 					spBuilder.setLength(0);
 					
 					resultBuilder.append(brk);
 					
-					outputWriter.write(resultBuilder.toString());
-					resultBuilder.setLength(0);
+//					outputWriter.write(resultBuilder.toString());
+//					resultBuilder.setLength(0);
 				}
 
 			}
@@ -857,11 +979,19 @@ public class GOEnrich {
 				
 				resultBuilder.append(brk);
 				
-				outputWriter.write(resultBuilder.toString());
-				resultBuilder.setLength(0);
+//				outputWriter.write(resultBuilder.toString());
+//				resultBuilder.setLength(0);
 			}
+//			if(goe.getId().equals("GO:0006641")){
+//				break;
+//			}
 		}
 		
+//		System.out.println(resultBuilder.toString());
+		
+		outputWriter.append(resultBuilder.toString());
+		resultBuilder.setLength(0);
+		outputWriter.close();
 	}
 	
 	public double[] BenjaminiHochberg(Double[] pValues) {
@@ -883,6 +1013,7 @@ public class GOEnrich {
 	}
 	
 	public ArrayList<String> getPath(GOEntry goeFrom, GOEntry goeTo, int length){
+//		System.out.println("GetPath: " + goeFrom.getId() + " " + goeTo.getId() + " " + length);
 		ArrayList<String> result = null;
 		String goeToId = goeTo.getId();
 		String goeFromId = goeFrom.getId();
@@ -901,14 +1032,17 @@ public class GOEnrich {
 				if(parent.getDistance().containsKey(goeToId)){
 					if(parent.getDistance().get(goeToId) == length-1){
 						if(parent.getPath(goeToId) == null){
+//							System.out.println("Go to: " + parent.getId());
 							result = getPath(parent,goeTo,length-1);
 						}
 						else{
-							result = parent.getPath(goeToId);
+//							System.out.print("Get Path: " + parent.getId());
+							result = new ArrayList<String>(parent.getPath(goeToId));
+//							System.out.println(" " + result);
 						}
 						result.add(0, goeFromId);
 						goeFrom.setPath(result);
-						break;
+						return result;
 					}
 				}
 			}
