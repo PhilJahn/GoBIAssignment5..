@@ -14,6 +14,10 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
 import java.util.zip.*;
 import org.apache.commons.math3.distribution.HypergeometricDistribution;
 import org.apache.commons.math3.stat.inference.KolmogorovSmirnovTest;
@@ -667,10 +671,10 @@ public class GOEnrich {
 		resultBuilder.setLength(0);
 		
 		ArrayList<GOEntry> outputGOE = new ArrayList<GOEntry>();
-		ArrayList<Double> hgValues = new ArrayList<Double>();
-		ArrayList<Double> fejValues = new ArrayList<Double>();
-		ArrayList<Double> kssValues = new ArrayList<Double>();
-		ArrayList<Double> kspValues = new ArrayList<Double>();
+		HashMap<String,Double> hgValues = new HashMap<String,Double>();
+		HashMap<String,Double> fejValues = new HashMap<String,Double>();
+		HashMap<String,Double> kssValues = new HashMap<String,Double>();
+		HashMap<String,Double> kspValues = new HashMap<String,Double>();
 		
 		GOEntry goe;
 		HashSet<String> goeGene;
@@ -681,21 +685,19 @@ public class GOEnrich {
 		HypergeometricDistribution fej;
 		KolmogorovSmirnovTest kst;
 		
-		ArrayList<Double> backgroundFC = new ArrayList<Double>();
 		
 		enrichedGene.retainAll(genes.keySet());
 		signif.retainAll(genes.keySet());
 		int eSize = enrichedGene.size();
 		int sSize = signif.size();
-
+		
+		ArrayList<Double> allFC = new ArrayList<Double>();
 		for(String eg : enrichedGene){
-			backgroundFC.add(genes.get(eg).getFC());
+			allFC.add(genes.get(eg).getFC());
 		}
 		
-		double[] bfc  = new double[backgroundFC.size()];
-		for(int i = 0; i < bfc.length; i++){
-			bfc[i] = backgroundFC.get(i);
-		}
+		ArrayList<Double> backgroundFC;
+		double[] bfc;
 		double[] fc;
 
 		
@@ -714,11 +716,19 @@ public class GOEnrich {
 				size = goeGene.size();
 				goe.setSize(size);
 				
+				
+				backgroundFC = new ArrayList<Double>(allFC);
 				fc = new double[goeGene.size()];
 				int j = 0;
 				for(String g: goeGene){
 					fc[j] = genes.get(g).getFC();
+					backgroundFC.remove(fc[j]);
 					j++;
+				}
+				
+				bfc = new double[backgroundFC.size()];
+				for(int i = 0; i < backgroundFC.size(); i++){
+					bfc[i] = backgroundFC.get(i);
 				}
 				
 				goeGene.retainAll(signif);
@@ -730,24 +740,23 @@ public class GOEnrich {
 				
 				hd = new HypergeometricDistribution(eSize, sSize, size);
 				
-				hgValues.add(hd.upperCumulativeProbability(noverlap));
+				hgValues.put(goeid,hd.upperCumulativeProbability(noverlap));
 				
 				fej = new HypergeometricDistribution(eSize-1, sSize-1, size-1);
-				fejValues.add(fej.upperCumulativeProbability(noverlap-1));
+				fejValues.put(goeid,fej.upperCumulativeProbability(noverlap-1));
+				
+
 				
 				kst = new KolmogorovSmirnovTest();
-				kssValues.add(kst.kolmogorovSmirnovStatistic(bfc,fc));
-				kspValues.add(kst.kolmogorovSmirnovTest(bfc,fc));
+				kssValues.put(goeid,kst.kolmogorovSmirnovStatistic(fc,bfc));
+				kspValues.put(goeid,kst.kolmogorovSmirnovTest(fc,bfc));
 			}
 		}
 		
-		Double[] hgArray = new Double[hgValues.size()];
-		Double[] fejArray = new Double[fejValues.size()];
-		Double[] kspArray = new Double[kspValues.size()];
 		
-		double[] hghbValues = BenjaminiHochberg(hgValues.toArray(hgArray));
-		double[] fejhbValues = BenjaminiHochberg(fejValues.toArray(fejArray));
-		double[] kshbValues = BenjaminiHochberg(kspValues.toArray(kspArray));
+		HashMap<String,Double> hghbValues = BenjaminiHochberg(hgValues);
+		HashMap<String,Double> fejhbValues = BenjaminiHochberg(fejValues);
+		HashMap<String,Double> kshbValues = BenjaminiHochberg(kspValues);
 		
 		StringBuilder spBuilder = new StringBuilder();
 		
@@ -766,8 +775,11 @@ public class GOEnrich {
 //			System.out.println(go_entries.get(eGOE).getName());
 		}
 		
+		String goeId ="";
+		
 		for(int i = 0; i < outputGOE.size(); i++){
 			goe = outputGOE.get(i);
+			goeId = goe.getId();
 			
 //			if(goe.getId().equals("GO:0044380")){
 //				System.out.println("I was here, too!");
@@ -783,81 +795,36 @@ public class GOEnrich {
 				trueGOE = null;
 				for(GOEntry tGOE : trueGO){
 					goe2Dist = tGOE.getDistance();
-//					if(goe.getId().equals("GO:0006641")){
-//						System.out.print(tGOE.getId());
-//					}
-//					if(goe1Dist.containsKey(tGOE.getId())){
-//						if(minDist == -1){
-//							minDist = goe1Dist.get(tGOE.getId());
-//							minGOE = tGOE;
-//							trueGOE = tGOE;
-//						}
-//						else{
-//							dist = goe1Dist.get(tGOE.getId());
-//							if(minDist > dist){
-//								minDist = dist;
-//								minGOE = tGOE;
-//								trueGOE = tGOE;						
-//							}
-//						}
-////						if(goe.getId().equals("GO:0006641")){
-////							System.out.println(" " + minDist + " " + minGOE.getId() + " " + trueGOE.getId() );
-////						}
-//					}
-//					else if(goe2Dist.containsKey(goe.getId())){
-//						if(minDist == -1){
-//							minDist = goe2Dist.get(goe.getId());
-//							minGOE = goe;
-//							trueGOE = tGOE;
-//						}
-//						else{
-//							dist = goe2Dist.get(goe.getId());
-//							if(minDist > dist){
-//								minDist = dist;
-//								minGOE = goe;
-//								trueGOE = tGOE;						
-//							}
-//						}
-//						if(goe.getId().equals("GO:0006641")){
-//							System.out.println(" " + minDist + " " + minGOE.getId() + " " + trueGOE.getId() );
-//						}
-//					}
-//					else{
-						goePred = new HashSet<String>(goe.getPred());
-						goePred.add(goe.getId());
+					goePred = new HashSet<String>(goe.getPred());
+					goePred.add(goeId);
 						
-						tgoePred = new HashSet<String>(tGOE.getPred());
-						tgoePred.add(tGOE.getId());
+					tgoePred = new HashSet<String>(tGOE.getPred());
+					tgoePred.add(tGOE.getId());
 						
-						goePred.retainAll(tgoePred);
+					goePred.retainAll(tgoePred);
 						
-						for(String compred : goePred){
-							if(minDist == -1){
-								minDist = goe1Dist.get(compred) + goe2Dist.get(compred);
+					for(String compred : goePred){
+						if(minDist == -1){
+							minDist = goe1Dist.get(compred) + goe2Dist.get(compred);
+							minGOE = go_entries.get(compred);
+							trueGOE = tGOE;
+						}
+						else{
+							dist = goe1Dist.get(compred) + goe2Dist.get(compred);
+							if(minDist > dist){
+								minDist = dist;
 								minGOE = go_entries.get(compred);
-								trueGOE = tGOE;
-							}
-							else{
-								dist = goe1Dist.get(compred) + goe2Dist.get(compred);
-								if(minDist > dist){
-									minDist = dist;
-									minGOE = go_entries.get(compred);
-									trueGOE = tGOE;									
-								}
+								trueGOE = tGOE;									
 							}
 						}
-//						if(goe.getId().equals("GO:0006641")){
-//							System.out.println(" " + minDist + " " + minGOE.getId() + " " + trueGOE.getId() );
-//						}
-//					}
+					}
 				}
 				
 //				System.out.println(goe.toString());
 				
 				if(!(minGOE != null)){
 				}else{
-
-					resultBuilder.append(goe.getId());
+					resultBuilder.append(goeId);
 					resultBuilder.append(tab);
 					
 					resultBuilder.append(goe.getName());
@@ -872,21 +839,21 @@ public class GOEnrich {
 					resultBuilder.append(goe.getNOverlap());
 					resultBuilder.append(tab);
 					
-					resultBuilder.append(hgValues.get(i));
+					resultBuilder.append(hgValues.get(goeId));
 					resultBuilder.append(tab);
-					resultBuilder.append(hghbValues[i]);
-					resultBuilder.append(tab);
-					
-					resultBuilder.append(fejValues.get(i));
-					resultBuilder.append(tab);
-					resultBuilder.append(fejhbValues[i]);
+					resultBuilder.append(hghbValues.get(goeId));
 					resultBuilder.append(tab);
 					
-					resultBuilder.append(kssValues.get(i));
+					resultBuilder.append(fejValues.get(goeId));
 					resultBuilder.append(tab);
-					resultBuilder.append(kspValues.get(i));
+					resultBuilder.append(fejhbValues.get(goeId));
 					resultBuilder.append(tab);
-					resultBuilder.append(kshbValues[i]);
+					
+					resultBuilder.append(kssValues.get(goeId));
+					resultBuilder.append(tab);
+					resultBuilder.append(kspValues.get(goeId));
+					resultBuilder.append(tab);
+					resultBuilder.append(kshbValues.get(goeId));
 				
 //					if(goe.getId().equals("GO:0006641")){
 //						System.out.println(goe.getPath(minGOE.getId()) );
@@ -961,21 +928,21 @@ public class GOEnrich {
 				resultBuilder.append(goe.getNOverlap());
 				resultBuilder.append(tab);
 				
-				resultBuilder.append(hgValues.get(i));
+				resultBuilder.append(hgValues.get(goeId));
 				resultBuilder.append(tab);
-				resultBuilder.append(hghbValues[i]);
-				resultBuilder.append(tab);
-				
-				resultBuilder.append(fejValues.get(i));
-				resultBuilder.append(tab);
-				resultBuilder.append(fejhbValues[i]);
+				resultBuilder.append(hghbValues.get(goeId));
 				resultBuilder.append(tab);
 				
-				resultBuilder.append(kssValues.get(i));
+				resultBuilder.append(fejValues.get(goeId));
 				resultBuilder.append(tab);
-				resultBuilder.append(kspValues.get(i));
+				resultBuilder.append(fejhbValues.get(goeId));
 				resultBuilder.append(tab);
-				resultBuilder.append(kshbValues[i]);
+				
+				resultBuilder.append(kssValues.get(goeId));
+				resultBuilder.append(tab);
+				resultBuilder.append(kspValues.get(goeId));
+				resultBuilder.append(tab);
+				resultBuilder.append(kshbValues.get(goeId));
 				
 				resultBuilder.append(brk);
 				
@@ -994,22 +961,32 @@ public class GOEnrich {
 		outputWriter.close();
 	}
 	
-	public double[] BenjaminiHochberg(Double[] pValues) {
+	public HashMap<String,Double> BenjaminiHochberg(HashMap<String,Double> pValues) {
 		
-		int length = pValues.length;
-        Arrays.sort(pValues);
+		ArrayList<Entry<String, Double>> pValueSort = new ArrayList<Map.Entry<String, Double>>(pValues.entrySet());
+		
+		pValueSort.sort(new DoubleValueComparator());
+		int length = pValueSort.size();
+		
         double[] apValues = new double[length];
 
         for (int i = length - 1; i >= 0; i--) {
             if (i == length - 1) {
-                apValues[i] = pValues[i];
+                apValues[i] = pValueSort.get(i).getValue();
             } else {
                 double l = apValues[i + 1];
-                double r = (length / (double) (i+1)) * pValues[i];
+                double r = (length / (double) (i+1)) * pValueSort.get(i).getValue();
                 apValues[i] = Math.min(l, r);
             }
         }
-        return apValues;
+        
+        HashMap<String,Double> apValueHash = new HashMap<String,Double>();
+        
+        for(int i = 0; i < length; i++){
+        	apValueHash.put(pValueSort.get(i).getKey(), apValues[i]);
+        }
+        
+        return apValueHash;
 	}
 	
 	public ArrayList<String> getPath(GOEntry goeFrom, GOEntry goeTo, int length){
@@ -1050,12 +1027,20 @@ public class GOEnrich {
 		return result;
 	}
 	
-	class StringComparator implements Comparator<String>
-	{
+	class StringComparator implements Comparator<String>{
+		@Override
 	    public int compare(String x1, String x2)
 	    {
 	        return x1.compareTo(x2);
 	    }
 	}
+	
+	 class DoubleValueComparator implements Comparator<Map.Entry<String, Double>> {
+		  @Override
+		  public int compare(Entry<String, Double> o1, Entry<String, Double> o2) {
+		    return o1.getValue().compareTo(o2.getValue());
+		  }
+	 }
+
 	
 }
